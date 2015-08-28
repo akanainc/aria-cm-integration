@@ -4,7 +4,7 @@
 [Akana.com](http://akana.com)
 
 ## Aria Community Manager Integration
-This integration demostrates the integration of Aria Systems billing solution with Akana Community Manager to give you powerfull subscription billing capabilities for your APIs. 
+This integration demonstrates the integration of Aria Systems billing solution with Akana Community Manager to give you powerful subscription billing capabilities for your APIs. 
 ## Aria Systems 
 ### About the Aria Systems
 
@@ -51,11 +51,11 @@ This integration demostrates the integration of Aria Systems billing solution wi
 #### Download and Import
 - Download Aria_Hooks.zip
 - Login to PolicyManager  example: http://localhost:9900
-- Select the root "Registry" organisation and click on the "Import Package" from the Actions navigation window on the right side of the screen
+- Select the root "Registry" organization and click on the "Import Package" from the Actions navigation window on the right side of the screen
   - click on button to browse for the Aria_Hooks.zip archive file 
   - click Okay to start the importation of the hook.
   - when prompted click Okay to deploy the virtual service to the container later.
-- this will create a Aria Hooks Organisation with the requisite artefacts needed to run the API.
+- this will create a Aria Hooks Organization with the requisite artifacts needed to run the API.
 
 #### Verify Import
 - Expand the services folder in the Aria Hooks you imported and find Box_API_Hook VS
