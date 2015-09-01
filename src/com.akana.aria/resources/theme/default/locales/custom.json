@@ -1,0 +1,18 @@
+{
+	"errors": {},
+	"labels": {
+		"customLoginPage": "/home/customdashboard",
+		"topnav_admin": "Admin",
+		"topnav_documents": "API Catalog",
+		"topnav_apps": "My Apps",
+		"topnav_support": "Resources",
+		"topnav_groups": "Groups",
+		"topnav_dashboard": "Dashboard",
+		"leftnav_apiscience" : "External Monitor",
+		"leftnav_aria": "Aria Billing"
+	},
+	"messages": {},
+	"validator": {
+		"errors": {}
+	}
+}

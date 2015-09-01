@@ -5,8 +5,12 @@
 
 ## Aria Community Manager Integration
 This integration demonstrates the integration of Aria Systems billing solution with Akana Community Manager to give you powerful subscription billing capabilities for your APIs. 
-## Aria Systems 
+![Aria Community Manager Integration](dist/images/aria-cm.png)
+
 ### About the Aria Systems
+Aria Systems is a cloud billing platform.
+
+Learn more at [Aria Systems](www.ariasystems.com)
 
 ### Pre-Reqs
 - You must have an account with Aria Systems
@@ -16,31 +20,11 @@ This integration demonstrates the integration of Aria Systems billing solution w
         + Note when an App gets created in Community Manager an account is create in Aria and assigned the Global Master Plan.  When that App subscribes to an API with a license that is mapped to a subplan in Aria, an account is created with the GMP and the sub-plan. All accounting is rolled up to the GMP which allows us to send out one invoice per App with all of its APIs.  
 - You need Policy Manager v7.2.11 or later
 - You need Community Manager v7.2.4.1 or later
-- you must install the pso extensions custom polices:
-    + unzip the com.akana.pso.apihooks.extensions_7.2.3.zip (available in this repository) into the <Policy Manager Home>/sm70 directory. 
-    + unzip the com.akana.pso.apihooks.technology.preview_7.2.92.zip (available in this repository) into the <Policy Manager Home>/sm70 directory
-    + stop all PM and ND(s)
-    + run the configurator in update mode for all the PM and ND instances:
-        + To run in configuration mode delete the cache directory of the container instance you are updating.
-        + run this command, depending on whether you are running on Windows or Linux:
-            Windows: 
-            [Gateway base dir]\sm70\bin>startup.bat configurator "-Dsilent=true" "-DdeploymentName=Standalone" "-Dproperties=C:/<property file directory location>/myprops.properties" 
-     
-            UNIX 
-            [Gateway base dir]/sm70/bin>startup.sh configurator "-Dsilent=true" "-DdeploymentName=Standalone" "-Dproperties=/export/home/username/<property file directory location>\myprops.properties"
-        + the myprops.properties path must be the fully qualified path, and the file contnents will look like:
-            container.instance.name=[intance name, e.g. PM]
-            credential.username = [administrator login] 
-            credential.password = [administrator password] 
-            default.host=[instance Host, e.g. localhost] 
-            default.port=[instance Port, e.g. 9905]
-            wizard.mode=update
-    + Using the SOA Admin Console, install the following Plug-ins in each PM container:
-        * Akana PSO API Gateway Extensions for API Hooks
-        * Akana PSO Simple Things API
-    + Using the SOA Admin Console, install the following Plug-ins in each ND container:
-        * Akana PSO API Gateway Extension for API Hooks
-    + restart all PM and ND(s)
+- You must install the pso extensions custom polices:
+    + Download the zip and follow the instructions [here](http://github.com/akanainc/akana-pso-tools/tree/master/akana-pso-apihooks-extensions)
+- You must install the pso technical preview:
+    + Download the zip and follow the instructions [here](https://github.com/akanainc/akana-pso-tools/tree/master/akana-pso-apihook-technology-preview)
+  
 - You need to install the Aria trusted CA certs into Policy Manager
     + From the Policy Manager console (example: http://localhost:9900) 
         + click on Configure -> Security -> Certificates -> Trusted CA Certificates
@@ -76,22 +60,128 @@ This integration demonstrates the integration of Aria Systems billing solution w
 #### Run the Aria Setup Postman transactions:
 - Load the collection into Postman
 - Change the host/port in all the URLs to be your system
-- Change the Basic Auth settings if you have something besides administrator/password
-- Run the “TenantInfo” and the “Make xxx container” transactions
+- Change the Basic Auth settings if you have something besides administrator/password for your Policy Manager authentication
+- Edit the TenantInfo Body
+    + Change the following
+        + ariaId to your aria client_no
+        + ariaKey to your aria auth_key 
+        + ariaHost to the Policy Manager host where SimpleThings is running
+        + set your payment defaults
+        + set the master plan
+
+        ```
+        {
+          "ariaId" : "8000042",
+          "ariaKey" : "jnXkeuskEA39hnse3sGph3yndUPKj8dX",
+          "ariaHost" : "http://heritage.soa.local:5501" ,
+          "defaults" : {
+            "country" : "US",
+            "currency" : "usd",
+            "paymentMethod" : 4,
+            "parentRespLevel" : 1,
+            "childRespLevel" : 2
+          },
+          "appVersionPlan" : {
+            "master_plan_no" : 332,
+            "master_plan_units" : 1
+          }
+        }
+
+        ```
+
+    + Run the “TenantInfo” request
 - You will need to create/customize the LicenseMap transactions for your own system. You will need to know: 
-    # LicenseId for all licenses to be mapped
-    # the Master Plan and Supplemental Plan numbers to be mapped. The easiest/only way of getting the LicenseId is to:
-        + export the license
+    - LicenseId for all Akana Community Manager licenses to be mapped. The easiest/only way of getting the LicenseId is to:
+        + Export the license from community manager
         + Look at the objectdata.xml file inside the export zip.
         + Get the content of the <LicenseID> element. It should look something like: e86a94ba-b8f7-4321-8c7e-6795144e412c.acme
+    - The Master Plan and Supplemental Plan numbers to be mapped. You can easily get these from Aria Systems UI. 
+- Edit or create new LicenseMaps   
     - The LicenseId needs to go in the Postman “LicenseMap” transactions two places:
         + In the URL path: /simplethings/Aria/license/<licenseid>.json
-        +  In the $/CM/id JSON element
+        + In the $/CM/id JSON element
     - The Aria Master Plan number needs to go into the …/AccountProperties/master_plan_no element in both sandbox and production
     - The Aria Supplemental Plan number needs to go two places in the sandbox and production elements:
         + $/Aria/plans/(sandbox|production)/plan
         + $/Aria/plans/(sandbox|production)/accountProperties/supp_plans
-- You need a separate “LicenseMap” transaction for each license that needs ot be mapped to an Aria plan
+    -Example LicenseMap
+    ```
+            {
+              "CM" : {
+                "id" : "20f080cc-04d9-4667-bab7-be43433c7110.heritage",
+                "name" : "Silver",
+                "description" : "This is the SILVER license"
+              },
+              "Aria" : {
+                "defaultPlan" : "sandbox",
+                "plans" : {
+                  "sandbox" : {
+                    "plan" : 387,
+                    "accountProperties" : {
+                      "master_plan_no" : 332,
+                      "master_plan_units" : 1,
+                      "supp_plans" : 387,
+                      "supp_plan_units" : 1
+                    },
+                    "serviceProperties" : {
+                      "gl_cd" : 1100,
+                      "service_type" : "Usage-Based",
+                      "usage_type" : 10019257
+                    },
+                    "planServiceProperties" : {
+                      "rate_type" : "Tiered Pricing",
+                      "pricing_rule" : "Standard",
+                      "schedule" : [
+                        { "schedule_name": "Silver Schedule",
+                          "currency_cd" : "usd",
+                          "is_default" : 1 }
+                      ],
+                      "tier" : [
+                        { "from" : 0, "to" : 50000,
+                          "schedule" : [ {"amount" : 0} ] },
+                        { "from" : 50001, "to" : null, 
+                          "schedule" : [ {"amount" : 0.01} ] }
+                      ]
+                    }
+                  },
+                  "production" : {
+                    "plan" : 387,
+                    "accountProperties" : {
+                      "master_plan_no" : 332,
+                      "master_plan_units" : 1,
+                      "supp_plans" : 387,
+                      "supp_plan_units" : 1
+                    },
+                    "serviceProperties" : {
+                      "gl_cd" : 1100,
+                      "service_type" : "Usage-Based",
+                      "usage_type" : 10019257
+                    },
+                    "planServiceProperties" : {
+                      "rate_type" : "Tiered Pricing",
+                      "pricing_rule" : "Standard",
+                      "schedule" : [
+                        { "schedule_name": "Silver Schedule",
+                          "currency_cd" : "usd",
+                          "is_default" : 1 }
+                      ],
+                      "tier" : [
+                        { "from" : 0, "to" : 50000,
+                          "schedule" : [ {"amount" : 0} ] },
+                        { "from" : 50001, "to" : null, 
+                          "schedule" : [ {"amount" : 0.01} ] }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+
+    ```
+    - You need a separate “LicenseMap” transaction for each license that needs ot be mapped to an Aria plan
+
+#### Import New Widget Into Community Manager
+
 
 ### License
 Copyright 2015 Akana, Inc.

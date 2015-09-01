@@ -1,0 +1,166 @@
+
+<style>
+  #single-monitor-details a {
+    color: #336699;
+  }
+
+  #aria-status-page {
+    width: 769px;
+    margin: auto;
+  }
+
+  #api-details table {
+    border: 0px;
+    background-color: #fff;
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  #aria-status-page table {
+    border: 1px solid #ddd;
+    background-color: #fff;
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  #aria-status-page table thead {
+    background-color: #ddd;
+    border-bottom: 1px solid #ddd;
+  }
+
+  #aria-status-page table thead > tr > th {
+    text-align: left;
+    text-transform: uppercase;
+    padding: 9px 12px;
+  }
+
+  #aria-status-page table tbody > tr > td {
+    padding: 9px 12px;
+    min-height: 40px;
+  }
+
+  #aria-status-page div.columns-2 .column {
+    width: 50%;
+    float: left;
+  }
+
+  #aria-status-page div.columns-2 .graph {
+    width: 100%;
+    height: 300px;
+  }
+
+  #aria-status-page .hidden {
+    display: none;
+  }
+</style>
+
+
+<br />
+<div id="aria-status-page">
+ <table id="aria-accounts" class="table">
+ <thead>
+   <tr>
+     <th>Account Details</th>
+   </tr>
+  </thead>
+  <tbody>
+   <tr class="copy">
+   <td>
+     <h2 id="api_name"></h2> <br />
+    <table class="api-details">
+    <tbody>
+    <tr><td>Account Owner:</td><td id="account_owner"></td></tr>
+    <tr><td>Account Number:</td><td id="account_id"></td></tr>
+    <tr><td>Account Balance:</td><td id="account_balance"></td></tr>
+    </tbody>
+    </table>
+  <br/>
+ 
+  <h4 id="status_page_detail">Recent Invoices </h4>
+  <table id="invoice_history_details" class="table">
+    <thead>
+      <tr>
+       <th>Invoice Number</th>
+        <th>Invoice Date</th>
+        <th>Recurring Period</th>
+        <th>Usage Period</th>
+        <th>Amount</th>
+        <th>Total Paid</th>
+        <th>Balance Due</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="copy">
+        <td class="invoiceNumber"></td>
+        <td class="invDate"></td>
+        <td class="recurringPeriod"></td>
+        <td class="usagePeriod"></td>
+        <td class="amount"></td>
+         <td class="totalPaid"></td>
+         <td class="balanceDue"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <br />
+
+   <h4>Recent Payments</h4>
+  <table id="payment_history" class="table">
+    <thead>
+      <tr>
+        <th>Payment No.</th>
+        <th>Date</th>
+        <th>Source</th>
+        <th>Status</th>
+        <th>Amount</th>
+        <th>Applied Amt.</th>
+        <th>Unapplied Amt.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="copy">
+        <td class="paymentNo"></td>
+        <td class="paymentDate"></td>
+        <td class="source"></td>
+        <td class="status"></td>
+        <td class="amount"></td>
+        <td class="appliedAmt"></td>
+        <td class="unappliedAmt"></td>
+      </tr>
+    </tbody>
+  </table>
+  <br />
+
+  <h4>Recent Transactions</h4>
+  <table id="transaction_history" class="table">
+    <thead>
+      <tr>
+        <th>Trans. No</th>
+        <th>Posting Date</th>
+        <th>Description</th>
+        <th>Start Bal.</th>
+        <th>Charge Amt.</th>
+        <th>Credit Amt.</th>
+        <th>End Bal.</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="copy">
+        <td class="transNo"></td>
+        <td class="postingDate"></td>
+        <td class="description"></td>
+        <td class="startBal"></td>
+        <td class="chargeAmt"></td>
+        <td class="creditAmt"></td>
+        <td class="endBal"></td>
+      </tr>
+    </tbody>
+  </table>
+  <br />
+   <hr />
+    </td>
+    </tr>
+  </tbody>
+ </table>
+</div>

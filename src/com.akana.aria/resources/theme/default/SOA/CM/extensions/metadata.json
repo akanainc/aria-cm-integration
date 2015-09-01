@@ -1,0 +1,68 @@
+{
+	"scriptResources" : [
+		"DEMO/aria/ariaCan.js"
+	],
+	"uriParserScriptFiles": {
+		"aria": "uriparsers/search/searchuriparser.js"
+	},
+	
+	"layoutStructure": [
+		{
+		"objType": "app",
+		"view": "aria",
+		"layout":[
+				{
+				"widgetInstance": "Main",
+				"widget": "widget.horiz.tiling",
+				"priority": "100"
+				},
+				{
+				"widgetInstance": "Header",
+				"widget": "widget.header",
+				"parentWidgetInstance": "Main",
+				"parent": "widget.horiz.tiling",
+				"priority": "1000"
+				},
+				{
+				"widgetInstance": "Left",
+				"widget": "widget.horiz.tiling",
+				"parentWidgetInstance": "Main",
+				"parent": "widget.horiz.tiling",
+				"priority": "2100"
+				},
+				{
+				"widgetInstance": "NestedMenu",
+				"widget": "widget.nested.menu",
+				"parentWidgetInstance": "Left",
+				"parent": "widget.horiz.tiling",
+				"priority": "2101"
+				},
+				{
+				"widgetInstance": "Content-Wide",
+				"widget": "widget.horiz.tiling",
+				"parentWidgetInstance": "Main",
+				"parent": "widget.horiz.tiling",
+				"priority": "2200"
+				},
+				{
+				"widgetInstance": "ResourceTitle",
+				"widget": "widget.resource.title",
+				"parentWidgetInstance": "Content-Wide",
+				"parent": "widget.horiz.tiling",
+				"priority": "2201"
+				},
+				{
+				"widgetInstance": "soa-control-cm-training-custom-widget",
+				"widget": "widget.iconsole.adapter",
+				"parentWidgetInstance": "Content-Wide",
+				"parent": "widget.horiz.tiling",
+				"priority": "2302",
+				"properties": {
+                        "widgetKey": "ariaFormContainer"
+                    }
+				}
+			] 
+		}
+	]
+}
+

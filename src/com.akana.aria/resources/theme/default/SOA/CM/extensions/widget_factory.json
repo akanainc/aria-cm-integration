@@ -1,0 +1,20 @@
+{
+	
+
+	"ariaFormContainer": {
+		"widgets": [
+			{
+				"position": "html",
+				"view": "DEMO/aria/ariaCan_container.ejs"
+			}
+		]
+	},
+	"ariaCustomForm" : {
+		"widgets": [
+			{
+				"position": "html",
+				"view": "DEMO/aria/ariaCan.ejs"
+			}
+		]
+	}
+}
