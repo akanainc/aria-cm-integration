@@ -56,6 +56,13 @@ Learn more at [Aria Systems](www.ariasystems.com)
 - for each contract click on the "Activate Contract" workflow activity in the right-hand Activities portlet
 - ensure that the status changes to "Workflow Is Completed"
 
+#### Modify and Activate Aria CORS policy
+- Under the Aria Hooks organization you just imported
+    + Expand Policies -> Operational Policies and click on AriaAccountCors
+    + Click on Modify
+    + Under the Allow Header section, change the X-Csrf-Token_heritage and replace heritage with your Community Manager tenant name
+    + Click apply
+    + On the right hand side of the screen click on the Activate Policy link
 
 #### Run the Aria Setup Postman transactions:
 - Load the collection into Postman
