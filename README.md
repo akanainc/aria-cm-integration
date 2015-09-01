@@ -104,7 +104,7 @@ Learn more at [Aria Systems](www.ariasystems.com)
     - The Aria Supplemental Plan number needs to go two places in the sandbox and production elements:
         + $/Aria/plans/(sandbox|production)/plan
         + $/Aria/plans/(sandbox|production)/accountProperties/supp_plans
-    -Example LicenseMap
+    - Example LicenseMap
     ```
             {
               "CM" : {
@@ -178,9 +178,47 @@ Learn more at [Aria Systems](www.ariasystems.com)
             }
 
     ```
-    - You need a separate “LicenseMap” transaction for each license that needs ot be mapped to an Aria plan
+    - You need a separate “LicenseMap” transaction for each license that needs to be mapped to an Aria plan
 
-#### Import New Widget Into Community Manager
+
+#### Import the theme into Community Manager
+#####There are two options for installation of the theme.
+1. From Community Manager's Config - Resources page, under Resource click on File Manager, and then click on Upload a Zip Archive.  Point to the dist/resource/theme.zip you download from github.
+2. Change the configuration of you community manager to load the theme from a directory by:
+    + Clone the GitHub repository
+    + Logging into the admin console http://localhost:9900/admin
+    + Clicking on Configuration
+    + Select com.soa.atmosphere from the left nav.
+        + Change the atmosphere.config.loadResourcesFromWorkspace to true
+        + Change atmosphere atmosphere.config.resourcesPath :  {yourrootpath}/AkanaInc/aria-cm-integration/src/com.akana.aria
+    + Restart CM
+
+For both options:
++ On the configuration view, go to  CONFIG -> CUSTOM SYTLES and click Rebuild Styles
++ Clear your browser cache.
+
+##### Change SimpleThings username / password
+- Open the theme/default/DEMO/aria/ariaCan.js
+    + find the getAccountIdFromThings function
+    + change the username and password in the ajax call to the username and password that can access SimpleThings.  This is usually the same as your Policy Manager logon in development. 
+
+Option #2 is good for if you are going to do further developement on the theme.
+
+##### What is in the theme
++ theme/default/DEMO/aria - Contains the files for the Community Manager Aria widget
++ SOA/CM/extensions - These files basically register the widget with the UI and create a the view
+    + Left_nav.json - Overides the default left nav configuration and adds the Aria link on the left navigation on the APP view for the owner of the APP.  You can configure this how you wish.
+    + widget_factor.json - Defines the new widget. References the ejs files from the /theme/default/DEMO/aria directory
+    + metadata.json - Defines the new aria view.  It references the widget key you defined in the widget_factory.json
++ locales and i18n - Are for Internationalization
++ less
+    + custom.less - I set leftnav-active-icons: none;
+    ```
+    // path to the image file of 18px sprites of leftnav navigation items that reflect the current section of "subject" details
+    @leftnav-active-icons: none;
+
+    ```
+
 
 
 ### License
