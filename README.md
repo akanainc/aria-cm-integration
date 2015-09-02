@@ -225,7 +225,13 @@ Option #2 is good for if you are going to do further developement on the theme.
     @leftnav-active-icons: none;
 
     ```
-
+#### Load Aria Workflow Into Community Manager
+Install the Community Manager custom workflows using a Site Admin user:
++ From Community Manager click on the Wrench/Workflows/Add Workflow:
+  + Load dist/workflow/appversion-aria-201508217.xml with: Name=workflow:definition:appversion:aria:0817 Object Type: Application
+  + Load workflow/apicontract-aria-201508217.xml with: Name=workflow:definition:apicontract:aria:0817 Object Type: API Access Request
++ From Community Manager click on the Wrench/Settings/APPS: set App Definition Workflow to workflow:definition:appversion:aria:0817
++ From Community Manager click on the Wrench/Settings/CONNECTIONS: set Sandbox Contract Workflow and Produciton Contract Workflow to workflow:definition:apicontract:aria:0817
 
 
 ### License

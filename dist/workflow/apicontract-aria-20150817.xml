@@ -1,0 +1,1594 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE workflow PUBLIC "-//OpenSymphony Group//DTD OSWorkflow 2.9//EN"
+                 "http://www.opensymphony.com/osworkflow/workflow_2_9.dtd" [
+
+<!ENTITY AriaApiContractWorkflowScript "script:9cba5386-1611-11e5-89c0-ceb227c9b263" >
+
+<!ENTITY AtmoContractStatusApproved "apicontract.status.approved" >
+<!ENTITY AtmoContractStatusPendingApproval "apicontract.status.pending_approval" >
+<!ENTITY AtmoContractStatusActivated "apicontract.status.activated" >
+<!ENTITY AtmoContractStatusResubmitted "apicontract.status.resubmitted">
+<!ENTITY AtmoContractStatusRejected "apicontract.status.rejected" >
+<!ENTITY AtmoContractStatusCancelled "apicontract.status.cancelled" >
+<!ENTITY AtmoContractStatusSuspended "apicontract.status.suspended" >
+<!ENTITY AtmoContractAppSwitchedToProduction "api.contract.app.in.production" >
+<!ENTITY AtmoContractAppDeleted "apicontract.status.app.deleted" >
+<!ENTITY AtmoContractApiDeleted "apicontract.status.api.deleted" >
+<!ENTITY AtmoRoleApiAdmin "ApiAdmin" >
+<!ENTITY AtmoRoleApiInvitedUser "ApiInvitedUser" >
+<!ENTITY AtmoRoleAppAdmin "AppAdmin" >
+
+]>
+
+
+<!-- ============================================================
+   default_apicontract_workflow.xml
+   
+   This workflow handles App.Version-to-API.version contract
+   lifecycle.
+
+   Change log:
+        v1.0: - initial version.
+        v1.1: - Add an "Activate" step after Approve. The 'version'
+                function happens here instead of Approve.
+        v1.2: - Change to be just workflow for Atmo apicontracts
+              - Remove PM Contract workflow steps
+
+================================================================== -->
+<workflow>
+	<common-functions>
+		<common-function name="registerContractInAria" >
+			<function type="runScript">
+                <arg name="lang">javascript</arg>
+                <arg name="import">&AriaApiContractWorkflowScript;</arg>
+                <arg name="id">registerContractInAria</arg>
+                <arg name="script">
+                	ARIA.WF.APIContract.registerContractInAria();
+				</arg>
+			</function>
+		</common-function>
+		<common-function name="updateContractStatusInAria" >
+			<function type="runScript">
+                <arg name="lang">javascript</arg>
+                <arg name="import">&AriaApiContractWorkflowScript;</arg>
+                <arg name="id">updateContractStatusInAria</arg>
+                <arg name="script">
+                	ARIA.WF.APIContract.updateContractStatusInAria();
+				</arg>
+			</function>
+		</common-function>
+		<common-function name="updateContractScopeInAria" >
+			<function type="runScript">
+                <arg name="lang">javascript</arg>
+                <arg name="import">&AriaApiContractWorkflowScript;</arg>
+                <arg name="id">updateContractScopeInAria</arg>
+                <arg name="script">
+                	ARIA.WF.APIContract.updateContractScopeInAria();
+				</arg>
+			</function>
+		</common-function>
+	</common-functions>
+	
+    <initial-actions>
+        <!-- All actions route to step 100 -->
+        <action id="1" name="@Create">
+            <results>
+                <unconditional-result old-status="Received" status="Pending" step="100" owner="${caller}"/>
+            </results>
+        </action>
+        <action id="9" name="@reset">
+            <results>
+                <unconditional-result old-status="Unknown" status="Unknown" step="100" owner="${caller}"/>
+            </results>
+        </action>
+    </initial-actions>
+    
+    <steps>
+        <!-- 
+        
+        /** **************************************************************
+         ** **************************************************************
+         **
+         ** ALL ATMOSPHERE CONTRACTS:
+         **
+         ** Split contracts for sandbox and live endpoints
+         **
+         ** **************************************************************
+         ** **************************************************************/
+         
+      -->
+        <step id="100" name="Route API Contract">
+            <actions>
+                <action id="100" name="Auto-Approve Sandbox Requests" auto="TRUE"> <!-- to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAtmosphereSandboxApiContract" />
+                            <condition type="isAtmosphereSandboxAutoApprove" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending" status="Activated" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="autoApproveAccessRequest">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+				
+						<function type="sendNotification">
+                             <arg name="notificationType">com.soa.notification.type.api.access.requested.both.apiadmin</arg>
+                             <arg name="role">ApiAdmin</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.sandbox.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+                        </function>
+						<function type="common" name="registerContractInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+							
+                    </post-functions>
+                </action>
+                <action id="101" name="Auto-Approve Production Requests From Sandbox App" auto="TRUE"> <!-- to 500 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAtmosphereProductionApiContract" />
+                            <condition type="isAtmosphereProductionAutoApprove" />
+                            <condition type="isAPIContractFromSandboxApp" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending" status="Approved" step="500" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="autoApproveAccessRequest">
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+				
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.both.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+						<function type="common" name="registerContractInAria">
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="102" name="Auto-Approve Production Requests From Production App" auto="TRUE"> <!-- to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAtmosphereProductionApiContract" />
+                            <condition type="isAtmosphereProductionAutoApprove" />
+                            <condition type="isAPIContractFromProductionApp" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending" status="Activated" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.both.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+						<function type="common" name="registerContractInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="103" name="Manual Approval Needed for Sandbox API" auto="TRUE"> <!-- to 300 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAtmosphereSandboxApiContract" />
+                        </conditions>
+                    </restrict-to>
+					<results>
+                        <unconditional-result old-status="Pending" status="Pending Approval" step="300" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.both.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.sandbox.notauto.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+						<function type="common" name="registerContractInAria">
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+					</post-functions>
+                </action>
+                <action id="104" name="Manual Approval Needed for Production API" auto="TRUE"> <!-- to 300 -->
+                     <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAtmosphereProductionApiContract" />
+                        </conditions>
+                    </restrict-to>
+                   <results>
+                        <unconditional-result old-status="Pending" status="Pending Approval" step="300" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.both.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.requested.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+						<function type="common" name="registerContractInAria">
+                            <arg name="status">&AtmoContractStatusPendingApproval;</arg>
+                        </function>
+					</post-functions>
+                </action>
+ 
+
+				<action id="109" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Pending" status="Pending" step="-1"/>
+                    </results>
+                </action>
+            </actions>
+        </step>
+        
+        <!--
+         ** **************************************************************
+         **
+         ** ALL MANUAL ATMOSPHERE CONTRACT APPROVE/REJECT
+         **
+         ** Restricted to Atmo API Admin
+         **
+         ** **************************************************************
+        -->
+        <step id="300" name="Pending Approval!">
+            <actions>
+                <action id="301" name="apicontract.action.approve"> <!-- SB to 600 PROD to 500 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isAPIContractFromSandboxApp" />
+                            <condition type="isAPIContractScopeNotEmpty"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <result old-status="Pending Approval" status="Activated" step="600" >
+                            <conditions type="AND">
+                                <condition type="isAtmosphereSandboxApiContract" />
+                            </conditions>
+                            <pre-functions>
+		                        <function type="updateAPIContractStatus">
+		                            <arg name="status">&AtmoContractStatusActivated;</arg>
+		                        </function>
+								<function type="sendNotification">
+									<arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+									<arg name="role">ApiAdmin</arg>
+									<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+		                        <function type="sendNotification">
+		                            <arg name="notificationType">com.soa.notification.type.api.access.activated.sandbox.appteam</arg>
+		                            <arg name="role">AppAdmin</arg>
+									<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractStatusActivated;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <result old-status="Pending Approval" status="Approved" step="500" >
+                            <conditions type="AND">
+                                <condition type="isAtmosphereProductionApiContract" />
+                            </conditions>
+                            <pre-functions>
+		                        <function type="updateAPIContractStatus">
+		                            <arg name="status">&AtmoContractStatusApproved;</arg>
+		                        </function>
+								<function type="sendNotification">
+									<arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+									<arg name="role">ApiAdmin</arg>
+									<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+		                        <function type="sendNotification">
+		                            <arg name="notificationType">com.soa.notification.type.api.access.approved.production.appteam</arg>
+		                            <arg name="role">AppAdmin</arg>
+									<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractStatusApproved;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <unconditional-result old-status="Pending Approval" status="ERROR" step="-1"/>  <!--  should not reach here -->
+                    </results>
+                </action>
+                <action id="302" name="apicontract.action.approve"> <!-- to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isAPIContractFromProductionApp" />
+							<condition type="isAtmosphereProductionApiContract" />
+                            <condition type="isAPIContractScopeNotEmpty"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Activated" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							  <arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.activated.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+   							  <arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="303" name="apicontract.action.reject"> <!-- to 800 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Rejected" step="800" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusRejected;</arg>
+                        </function>
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.rejected.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusRejected;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="304" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="307" name="@AppDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.appdeleted.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="308" name="@app_switch_to_production">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAPIContractFromSandboxApp" />
+                            <condition type="isAtmosphereSandboxApiContract" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Cancelled" step="900"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.applive.sandbox.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="309" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Pending Approval" step="-1"/>
+                    </results>
+                </action>
+                <action id="310" name="@ApiDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.apideleted.appteam</arg>
+                              <arg name="role">&AtmoRoleAppAdmin;</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+
+                    </post-functions>
+                </action>
+                <action id="311" name="apicontract.action.sync.app.version">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isRemoteFedMemberApp"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Pending Approval" step="-1"/>
+                    </results>
+                    <post-functions>
+                        <function type="synchronizeAppVersion"/>
+                    </post-functions>
+                </action>
+                <action id="312" name="apicontract.action.editscope">
+                    <restrict-to>
+                        <conditions type="AND">
+                        	<conditions type="OR">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+	                            </condition>
+	                            <conditions type="AND">
+		                            <condition type="authorizeByAtmosphereRole">
+		                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+		                            </condition>
+		                            <condition type="authorizeByAtmosphereRole">
+		                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+		                            </condition>
+								</conditions>
+							</conditions>
+							<conditions type="OR">
+	                           	<condition type="apiContractUsesRestrictedScope"/>
+	                           	<condition type="apiVersionSupportsResourceLevelPermissions"/>
+							</conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Pending Approval" step="-1"/>
+                    </results>
+                    <post-functions>
+						<function type="common" name="updateContractScopeInAria">
+                        </function>
+                    </post-functions>
+                </action>
+				<action id="313" name="apicontract.action.edit">
+					<restrict-to>
+						<conditions type="OR">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleApiAdmin;</arg>
+							</condition>
+							<conditions type="AND">
+								<condition type="authorizeByAtmosphereRole">
+									<arg name="role">&AtmoRoleAppAdmin;</arg>
+								</condition>
+								<condition type="authorizeByAtmosphereRole">
+									<arg name="role">&AtmoRoleApiInvitedUser;</arg>
+								</condition>
+							</conditions>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Pending Approval" status="Pending Approval" step="-1" />
+					</results>
+				</action>
+            </actions>
+        </step>
+        
+        <!--
+         ** **************************************************************
+         **
+         ** ATMOSPHERE CONTRACT IS APPROVED
+         **
+         ** Activate in PM and notify Atmo of status change
+         **
+         ** **************************************************************
+        -->
+        <step id="500" name="Approved">
+            <actions>
+                <action id="500" name="apicontract.action.activate"> <!-- to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Approved" status="Active" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.activated.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+
+                    </post-functions>
+                </action>
+                <action id="501" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="OR">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <conditions type="AND">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+	                            </condition>
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+	                            </condition>
+	                        </conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Approved" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+
+                    </post-functions>
+                </action>
+                <action id="507" name="@AppDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Approved" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.appdeleted.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="508" name="@app_switch_to_production"> <!-- SB-API to 900 PROD-API to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAPIContractFromSandboxApp" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <result old-status="Approved" status="Cancelled" step="900">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereSandboxApiContract" />
+                            </conditions>
+                            <pre-functions>
+                                <function type="updateAPIContractStatus">
+                                    <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                                </function>
+								<function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.applive.sandbox.apiadmin</arg>
+		                              <arg name="role">ApiAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+		                        </function>
+
+                            </pre-functions>
+                        </result>
+                        <result old-status="Approved" status="Activated" step="600">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereProductionApiContract" />
+                            </conditions>
+                            <pre-functions>
+                                <function type="updateAPIContractStatus">
+                                    <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                                </function>
+								<function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+		                              <arg name="role">ApiAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+		                        <function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.activated.production.appteam</arg>
+		                              <arg name="role">AppAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <unconditional-result old-status="Approved" status="ERROR" step="-1"/>  <!--  should not reach here -->
+                    </results>
+                </action>
+                <action id="509" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Approved" status="Approved" step="-1"/>
+                    </results>
+                </action>
+                <action id="510" name="@ApiDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Approved" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.apideleted.appteam</arg>
+                              <arg name="role">&AtmoRoleAppAdmin;</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="511" name="apicontract.action.sync.app.version">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isRemoteFedMemberApp"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Approved" status="Approved" step="-1"/>
+                    </results>
+                    <post-functions>
+                        <function type="synchronizeAppVersion"/>
+                    </post-functions>
+                </action>
+            </actions>
+        </step>
+        
+        <step id="600" name="Active">
+            <pre-functions>
+                <function type="activatePMContract" />
+            </pre-functions>
+            <actions>
+                <action id="600" name="apicontract.action.suspend"> <!-- to 750 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Suspended" step="750" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusSuspended;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.suspended.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusSuspended;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="601" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="OR">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <conditions type="AND">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+	                            </condition>
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+	                            </condition>
+	                        </conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="607" name="@AppDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.appdeleted.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="608" name="@app_switch_to_production"> <!-- SB-API to 900 PROD-API to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAPIContractFromSandboxApp" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <result old-status="Active" status="Cancelled" step="900">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereSandboxApiContract" />
+                            </conditions>
+                            <pre-functions>
+                                <function type="updateAPIContractStatus">
+                                    <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                                </function>
+								<function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.applive.sandbox.apiadmin</arg>
+		                              <arg name="role">ApiAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <result old-status="Active" status="Active" step="600">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereProductionApiContract" />
+                            </conditions>
+                        </result>
+                        <unconditional-result old-status="Approved" status="ERROR" step="-1"/>  <!--  should not reach here -->
+                    </results>
+                </action>
+                <action id="609" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Active" status="Active" step="-1"/>
+                    </results>
+                </action>
+                <action id="610" name="@ApiDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.apideleted.appteam</arg>
+                              <arg name="role">&AtmoRoleAppAdmin;</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="611" name="apicontract.action.sync.app.version">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isRemoteFedMemberApp"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Active" step="-1"/>
+                    </results>
+                    <post-functions>
+                        <function type="synchronizeAppVersion"/>
+                    </post-functions>
+                </action>
+            </actions>
+        </step>
+
+        <step id="750" name="Suspended">
+            <pre-functions>
+                <function type="suspendPMContract" />
+            </pre-functions>
+            <actions>
+                <action id="750" name="apicontract.action.resume"> <!-- to 600 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Active" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="resumePMContract" />
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.resumed.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+			      <arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="751" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="OR">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <conditions type="AND">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+	                            </condition>
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+	                            </condition>
+	                        </conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="757" name="@AppDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.appdeleted.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="758" name="@app_switch_to_production"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAPIContractFromSandboxApp" />
+                            <condition type="isAtmosphereSandboxApiContract" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Cancelled" step="900"/> 
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.applive.sandbox.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="759" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Suspended" step="-1"/>
+                    </results>
+                </action>
+                <action id="760" name="@ApiDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.apideleted.appteam</arg>
+                              <arg name="role">&AtmoRoleAppAdmin;</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="761" name="apicontract.action.sync.app.version">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isRemoteFedMemberApp"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Suspended" status="Suspended" step="-1"/>
+                    </results>
+                    <post-functions>
+                        <function type="synchronizeAppVersion"/>
+                    </post-functions>
+                </action>
+            </actions>
+        </step>
+        
+        <!--
+         ** **************************************************************
+         **
+         ** ATMOSPHERE CONTRACT APP OR API IS DELETED
+         **
+         **
+         ** **************************************************************
+        -->
+        <step id="775" name="ResourceDeleted">
+            <pre-functions>
+                <function type="deletePMContract" />
+            </pre-functions>
+            <actions>
+                <action id="775" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="OR">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <conditions type="AND">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+	                            </condition>
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+	                            </condition>
+	                        </conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Active" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+							<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+
+                    </post-functions>
+                </action>
+                
+                <action id="776" name="@modify">
+                    <results>
+                        <unconditional-result old-status="ResourceDeleted" status="ResourceDeleted" step="-1"/>
+                    </results>
+                </action>
+                <action id="777" name="@ApiDeleted">
+                    <results>
+                        <unconditional-result old-status="ResourceDeleted" status="ResourceDeleted" step="-1"/>
+                    </results>
+                </action>
+                <action id="778" name="@AppDeleted">
+                    <results>
+                        <unconditional-result old-status="ResourceDeleted" status="ResourceDeleted" step="-1"/>
+                    </results>
+                </action>
+            </actions>
+        </step>
+        
+        <!--
+         ** **************************************************************
+         **
+         ** ATMOSPHERE CONTRACT IS REJECTED
+         **
+         ** Notify Atmo of status change
+         **
+         ** **************************************************************
+        -->
+        <step id="800" name="Rejected">
+            <actions>
+                <action id="800" name="apicontract.action.resubmit"> <!-- to 300 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <result old-status="Rejected" status="Pending Approval" step="300">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereSandboxApiContract" />
+                            </conditions>
+                            <pre-functions>
+                                <function type="updateAPIContractStatus">
+		                            <arg name="status">&AtmoContractStatusResubmitted;</arg>
+                                </function>
+								<function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+		                              <arg name="role">ApiAdmin</arg>
+									<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+		                        <function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.resubmitted.both.appteam</arg>
+		                              <arg name="role">AppAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractStatusResubmitted;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <result old-status="Rejected" status="Pending Approval" step="300">
+                            <conditions type="AND">
+                                <condition type="isAtmosphereProductionApiContract" />
+                            </conditions>
+                            <pre-functions>
+                                <function type="updateAPIContractStatus">
+		                            <arg name="status">&AtmoContractStatusResubmitted;</arg>
+                                </function>
+								<function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+		                              <arg name="role">ApiAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+		                        <function type="sendNotification">
+		                              <arg name="notificationType">com.soa.notification.type.api.access.resubmitted.both.appteam</arg>
+		                              <arg name="role">AppAdmin</arg>
+										<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+		                        </function>
+								<function type="common" name="updateContractStatusInAria">
+		                            <arg name="status">&AtmoContractStatusResubmitted;</arg>
+		                        </function>
+                            </pre-functions>
+                        </result>
+                        <unconditional-result old-status="Rejected" status="ERROR" step="-1" owner="${caller}"/>
+                    </results>
+                </action>
+                <action id="801" name="apicontract.action.cancel"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="OR">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <conditions type="AND">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+	                            </condition>
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+	                            </condition>
+	                        </conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Cancelled" step="900" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.request.both.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusCancelled;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="802" name="apicontract.action.approve"> <!-- to 500 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isAPIContractFromSandboxApp" />
+                            <condition type="isAPIContractScopeNotEmpty"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Approved" step="500" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.approved.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusApproved;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="803" name="apicontract.action.approve"> <!-- to 500 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isAPIContractFromProductionApp" />
+                            <condition type="isAPIContractScopeNotEmpty"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Pending Approval" status="Activated" step="600" owner="${caller}"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.state.change.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+                        <function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.activated.production.appteam</arg>
+                              <arg name="role">AppAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractStatusActivated;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="807" name="@AppDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.appdeleted.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="808" name="@app_switch_to_production"> <!-- to 900 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="isAPIContractFromSandboxApp" />
+                            <condition type="isAtmosphereSandboxApiContract" />
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Cancelled" step="900"/> <!--  should not reach here -->
+                    </results>
+                     <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.applive.sandbox.apiadmin</arg>
+                              <arg name="role">ApiAdmin</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractAppSwitchedToProduction;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="809" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Rejected" step="-1"/>
+                    </results>
+                </action>
+                <action id="810" name="@ApiDeleted"> <!-- to 775 -->
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Pending Delete" step="775"/>
+                    </results>
+                    <post-functions>
+                        <function type="updateAPIContractStatus">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+ 
+						<function type="sendNotification">
+                              <arg name="notificationType">com.soa.notification.type.api.access.cancelled.apideleted.appteam</arg>
+                              <arg name="role">&AtmoRoleAppAdmin;</arg>
+								<arg name="param.contract.oldstate">${contract.oldstate}</arg>
+                        </function>
+						<function type="common" name="updateContractStatusInAria">
+                            <arg name="status">&AtmoContractApiDeleted;</arg>
+                        </function>
+                    </post-functions>
+                </action>
+                <action id="811" name="apicontract.action.sync.app.version">
+                    <restrict-to>
+                        <conditions type="AND">
+                            <condition type="authorizeByAtmosphereRole">
+                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+                            </condition>
+                            <condition type="isRemoteFedMemberApp"/>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Rejected" step="-1"/>
+                    </results>
+                    <post-functions>
+                        <function type="synchronizeAppVersion"/>
+                    </post-functions>
+                </action>
+                <action id="812" name="apicontract.action.editscope">
+                    <restrict-to>
+                        <conditions type="AND">
+                        	<conditions type="OR">
+	                            <condition type="authorizeByAtmosphereRole">
+	                                <arg name="role">&AtmoRoleApiAdmin;</arg>
+	                            </condition>
+	                            <conditions type="AND">
+		                            <condition type="authorizeByAtmosphereRole">
+		                                <arg name="role">&AtmoRoleAppAdmin;</arg>
+		                            </condition>
+		                            <condition type="authorizeByAtmosphereRole">
+		                                <arg name="role">&AtmoRoleApiInvitedUser;</arg>
+		                            </condition>
+								</conditions>
+							</conditions>
+							<conditions type="OR">
+	                           	<condition type="apiContractUsesRestrictedScope"/>
+	                           	<condition type="apiVersionSupportsResourceLevelPermissions"/>
+							</conditions>
+                        </conditions>
+                    </restrict-to>
+                    <results>
+                        <unconditional-result old-status="Rejected" status="Rejected" step="-1"/>
+                    </results>
+                    <post-functions>
+						<function type="common" name="updateContractScopeInAria">
+                        </function>
+                    </post-functions>
+                </action>
+				<action id="813" name="apicontract.action.edit">
+					<restrict-to>
+						<conditions type="OR">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleApiAdmin;</arg>
+							</condition>
+							<conditions type="AND">
+								<condition type="authorizeByAtmosphereRole">
+									<arg name="role">&AtmoRoleAppAdmin;</arg>
+								</condition>
+								<condition type="authorizeByAtmosphereRole">
+									<arg name="role">&AtmoRoleApiInvitedUser;</arg>
+								</condition>
+							</conditions>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Rejected" status="Rejected" step="-1" />
+					</results>
+				</action>
+            </actions>
+        </step>
+        
+        <!--
+         ** **************************************************************
+         **
+         ** ATMOSPHERE CONTRACT PROCESSING FINISHED
+         **
+         ** Keep workflow in suspended animation... preserves w/f history
+         **
+         ** **************************************************************
+        -->
+        <step id="900" name="Finished">
+            <pre-functions>
+                <function type="deletePMContract" />
+            </pre-functions>
+            <actions>
+                <action id="900" name="Finished">
+                    <results>
+                        <unconditional-result old-status="Finished" status="Finished" step="-1" owner="${caller}"/>
+                    </results>
+                </action>
+                <action id="909" name="@modify">
+                    <results>
+                        <unconditional-result old-status="Finished" status="Finished" step="-1"/>
+                    </results>
+                </action>
+                <action id="910" name="@ApiDeleted">
+                    <results>
+                        <unconditional-result old-status="Finished" status="Finished" step="-1"/>
+                    </results>
+                </action>
+                <action id="911" name="@AppDeleted">
+                    <results>
+                        <unconditional-result old-status="Finished" status="Finished" step="-1"/>
+                    </results>
+                </action>
+            </actions>
+       </step>
+    </steps>
+</workflow>

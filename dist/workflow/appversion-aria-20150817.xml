@@ -1,0 +1,517 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE workflow PUBLIC "-//OpenSymphony Group//DTD OSWorkflow 2.9//EN"
+                 "http://www.opensymphony.com/osworkflow/workflow_2_9.dtd" [
+
+<!ENTITY AriaAppVersionWorkflowScript "script:ec031c38-1611-11e5-89c0-ceb227c9b263" >
+
+<!ENTITY AtmoAppAddKeyInfo "appversion.keyinfo.add" >
+<!ENTITY AtmoAppRemoveKeyInfo "appversion.keyinfo.remove" >
+<!ENTITY AtmoAppRegenerateSecret "appversion.secret.regenerate">
+<!ENTITY AtmoRoleAppAdmin "AppAdmin" >
+<!ENTITY APPStateDeletePending "com.soa.app.state.delete.pending" >
+<!ENTITY APPStateActive "com.soa.app.state.active" >
+<!ENTITY AtmoRoleBusinessAdmin "BusinessAdmin">
+<!ENTITY AtmoRoleAdmin "Admin">
+
+]>
+
+
+
+<!-- ============================================================ 
+    default_appversion_workflow.xml 
+	 This workflow handles App Version KeyInfo related task lifecycle. 
+	 Change log: 
+	 
+	 v1.0: - initial version. 
+================================================================== -->
+<workflow>
+	<common-functions>
+		<common-function name="registerAppVersionInAria" >
+			<function type="runScript">
+                <arg name="lang">javascript</arg>
+                <arg name="import">&AriaAppVersionWorkflowScript;</arg>
+                <arg name="id">registerAppVersionInAria</arg>
+                <arg name="script">
+                	ARIA.WF.AppVersion.registerAppVersionInAria();
+				</arg>
+			</function>
+		</common-function>
+	</common-functions>
+	
+	<initial-actions>
+		<!-- All actions route to step 10 -->
+		<action id="1" name="@Create">
+			<results>
+				<unconditional-result old-status="Setup" status="Setup" step="90" owner="${caller}" />
+			</results>
+		</action>
+	</initial-actions>
+
+	<steps>
+		<step id="90" name="Start New AppVersion">
+			<actions>
+				<action id="90" name="Start New AppVersion" auto="TRUE">
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" />
+					</results>
+					<post-functions>
+						<function type="common" name="registerAppVersionInAria">
+                        </function>
+					</post-functions>
+				</action>
+			</actions>
+		</step>
+		<step id="100" name="Setup">
+			<actions>
+				<action id="101" name="@Modify">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" />
+					</results>
+				</action>
+				<action id="102" name="@Delete">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Deleted" step="200" />
+					</results>
+					<post-functions>
+						<function type="addBoardItem">
+							<arg name="boardItemTemplateId">com.soa.board.item.appversion.mark.for.delete</arg>
+							<arg name="visibility">Limited</arg>
+							<arg name="type">Discussion</arg>
+							<arg name="targetBoard.appversion">${app.version.dn}</arg>
+							<arg name="targetBoard.appdn">${app.dn}</arg>
+                            <arg name="targetBoard.appteamgrp">${app.team.group.dn}</arg>
+                            <arg name="targetBoard.apiversion">${connected.apiversion.ids}</arg>
+                            <arg name="targetBoard.apiadmin.groups">${connected.apis.admin.groups}</arg>
+                            <arg name="targetBoard.api">${connected.apis.id}</arg>
+                            <arg name="viewers">${app.dn},${app.team.group.dn},${connected.apis.id},${business.dn}</arg>
+                  		</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.marked.for.deletion.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.marked.for.deletion.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.marked.for.deletion.bizadmin</arg>
+							<arg name="role">BusinessAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="103" name="@KeyInfoSaved">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.added.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.added.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="104" name="@KeyInfoRemoved">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup"
+							status="Setup" step="100" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.removed.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.removed.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="105" name="@RegeneratedSecret">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.shared.secret.regenerated.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.shared.secret.regenerated.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="106" name="reserved-allow-cert-upload">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>
+				<action id="107" name="reserved-connect-to-api.Sandbox">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>
+				<action id="108" name="reserved-connect-to-api.Production">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>
+				<action id="109" name="@RemoveCert">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>
+				<action id="110" name="@EditApp">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>				
+				<action id="111" name="@RegenerateSecret">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>				
+				<action id="112" name="@AddVersion">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>								
+				<action id="113" name="@EditPublicProfile">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>								
+				<action id="114" name="@EditOAuthDetails">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>
+				<action id="115" name="@ModifyCert">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="100" owner="${caller}" />
+					</results>
+				</action>				
+			</actions>
+		</step>
+		<step id="200" name="Marked For Delete">
+			<actions>
+				<action id="201" name="@Modify">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+				</action>
+				<action id="202" name="com.soa.appversion.delete.approve">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<pre-functions>
+						<function type="addBoardItem">
+							<arg name="boardItemTemplateId">com.soa.board.item.appversion.delete.request.approved</arg>
+							<arg name="visibility">Limited</arg>
+							<arg name="type">Discussion</arg>
+							<arg name="targetBoard.appversion">${app.version.dn}</arg>
+							<arg name="targetBoard.appdn">${app.dn}</arg>
+                            <arg name="targetBoard.appteamgrp">${app.team.group.dn}</arg>
+                            <arg name="targetBoard.apiversion">${connected.apiversion.ids}</arg>
+                            <arg name="targetBoard.apiadmin.groups">${connected.apis.admin.groups}</arg>
+                            <arg name="targetBoard.api">${connected.apis.id}</arg>
+                            <arg name="viewers">${app.dn},${app.team.group.dn},${connected.apis.id},${business.dn}</arg>
+                  		</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.approved.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.approved.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.approved.bizadmin</arg>
+							<arg name="role">BusinessAdmin</arg>
+						</function>
+						<function type="deleteAppVersion" />
+					</pre-functions>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="400" owner="${caller}" />
+					</results>
+				</action>
+				<action id="203" name="com.soa.appversion.delete.reject">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete"
+							status="Setup" step="100" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="addBoardItem">
+							<arg name="boardItemTemplateId">com.soa.board.item.appversion.delete.request.rejected</arg>
+							<arg name="visibility">Limited</arg>
+							<arg name="type">Discussion</arg>
+							<arg name="targetBoard.appversion">${app.version.dn}</arg>
+							<arg name="targetBoard.appdn">${app.dn}</arg>
+                            <arg name="targetBoard.appteamgrp">${app.team.group.dn}</arg>
+                            <arg name="targetBoard.apiversion">${connected.apiversion.ids}</arg>
+                            <arg name="targetBoard.apiadmin.groups">${connected.apis.admin.groups}</arg>
+                            <arg name="targetBoard.api">${connected.apis.id}</arg>
+                            <arg name="viewers">${app.dn},${app.team.group.dn},${connected.apis.id},${business.dn}</arg>
+                  		</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.rejected.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.rejected.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.deletion.request.rejected.bizadmin</arg>
+							<arg name="role">BusinessAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="204" name="reserved-allow-cert-upload">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+				</action>
+				<action id="206" name="@KeyInfoSaved">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.added.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.added.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="207" name="@KeyInfoRemoved">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.removed.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.certificate.removed.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="208" name="@RegeneratedSecret">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+					<post-functions>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.shared.secret.regenerated.appteam</arg>
+							<arg name="role">AppAdmin</arg>
+						</function>
+						<function type="sendNotification">
+							<arg name="notificationType">com.soa.notification.type.app.version.shared.secret.regenerated.apiadmin</arg>
+							<arg name="role">ApiAdmin</arg>
+						</function>
+					</post-functions>
+				</action>
+				<action id="209" name="reserved-connect-to-api.Sandbox">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+				</action>
+				<action id="210" name="reserved-connect-to-api.Production">
+					<restrict-to>
+						<conditions type="AND">
+							<condition type="authorizeByAtmosphereRole">
+								<arg name="role">&AtmoRoleBusinessAdmin;</arg>
+							</condition>
+						</conditions>
+					</restrict-to>
+					<results>
+						<unconditional-result old-status="Marked For Delete" status="Marked For Delete" step="200" owner="${caller}" />
+					</results>
+				</action>
+			</actions>
+		</step>
+		<step id="300" name="Auto Delete">
+			<actions>
+				<action id="301" name="com.soa.appversion.delete.auto" auto="TRUE">
+					<pre-functions>
+						<function type="autoDeleteAppVersion"/>
+					</pre-functions>
+					<results>
+						<unconditional-result old-status="Setup" status="Setup" step="400" owner="${caller}" />
+					</results>
+				</action>
+			</actions>
+		</step>
+		<step id="400" name="Deleted">
+			<!-- no actions here as app version is deleted -->
+		</step>
+	</steps>
+</workflow>
